@@ -1,0 +1,26 @@
+# 🦁 Singh Ji Agentic AI v10.0 — Dependencies
+# Python 3.11+
+
+# Web Framework
+fastapi==0.111.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.9
+
+# HTTP Client
+aiohttp==3.9.5
+requests==2.32.3
+
+# Database
+supabase==2.5.1
+
+# Environment
+python-dotenv==1.0.1
+
+# Utilities
+pydantic==2.7.4
+python-dateutil==2.9.0
+
+# Optional: For advanced features
+# pillow==10.3.0          # Image processing
+# celery==5.4.0           # Background tasks (alternative to asyncio)
+# redis==5.0.6            # Redis for caching

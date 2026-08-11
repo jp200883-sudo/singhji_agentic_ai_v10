@@ -1,0 +1,23 @@
+# 🦁 Singh Ji Agentic AI v10.0 — Render Deploy Config
+services:
+  - type: web
+    name: singhji-agentic-ai
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PORT
+        value: 8000
+      # Add your secrets in Render Dashboard:
+      # - TELEGRAM_BOT_TOKEN
+      # - GROQ_API_KEY
+      # - SUPABASE_URL
+      # - SUPABASE_KEY
+      # - INSTAGRAM_ACCESS_TOKEN
+      # - INSTAGRAM_USER_ID
+      # - ADMIN_CHAT_ID
+    healthCheckPath: /ping
+    autoDeploy: true
