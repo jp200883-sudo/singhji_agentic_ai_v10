@@ -55,7 +55,7 @@ plain
 🎯 AI Summary: "Kanpur में 5 cafes को message भेज दिया है। 
 2 दिन बाद auto follow-up होगा। Leads database में save हो गए हैं।"
 📞 Support
-WhatsApp: 7905 840149
+WhatsApp: 790××××××9
 Telegram: @SinghJiUltraBot
 "API keys लगाओ, Goal दो, Leads आएंगी!" 🦁
 Singh Ji Agentic AI v10.0 — Production Ready
