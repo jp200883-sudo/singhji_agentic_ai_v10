@@ -469,7 +469,7 @@ class ToolBox:
             sys_msg = system_prompt or "You are Singh Ji AI — a helpful Hindi/English assistant for Indian businesses."
 
             payload = {
-                "model": "llama3-70b-8192",
+                "model":"openai/gpt-oss-120b",
                 "messages": [
                     {"role": "system", "content": sys_msg},
                     {"role": "user", "content": prompt}
