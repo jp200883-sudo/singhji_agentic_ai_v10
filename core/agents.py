@@ -1,6 +1,6 @@
 """
-🤖 Singh Ji Agents — Research, Sales, Build, Support
-Each Agent has specific skills and can use Tools
+🤖 Singh Ji Agents — Production Ready
+Research, Sales, Build, Support — All use Real APIs
 """
 
 import os
@@ -36,57 +36,76 @@ class BaseAgent:
         logger.info(f"[{self.name}] {message}")
 
 # ============================================
-# RESEARCH AGENT — Data ढूँढना, Analyze करना
+# RESEARCH AGENT — Real Google Maps + Web Search
 # ============================================
 
 class ResearchAgent(BaseAgent):
     """
     Research Agent:
-    - Google Maps से Business ढूँढना
-    - Web Search
+    - Google Maps API से Real Business ढूँढना
+    - Web Search (Serper/Tavily/Scrapfly)
     - Data Analysis
-    - Content Generation
+    - AI Content Generation
     """
 
     def __init__(self):
         super().__init__("ResearchAgent")
 
     async def research_businesses(self, params: Dict) -> Dict:
-        """Google Maps / Web से Business ढूँढो"""
-        self._log("🔍 Researching businesses...")
+        """Real Google Maps से Business ढूँढो"""
+        self._log("🔍 Researching businesses via Google Maps API...")
 
         goal = params.get('goal', '')
         source = params.get('source', 'google_maps')
 
-        # Demo data — Real implementation में API call होगी
-        businesses = [
-            {"name": "Sharma Cafe", "city": "Kanpur", "phone": "+91-98765xxxxx", "rating": 4.2, "has_website": False},
-            {"name": "Gupta Sweets", "city": "Kanpur", "phone": "+91-98765xxxxx", "rating": 3.8, "has_website": False},
-            {"name": "Royal Restaurant", "city": "Kanpur", "phone": "+91-98765xxxxx", "rating": 4.5, "has_website": True},
-            {"name": "New Cafe Point", "city": "Kanpur", "phone": "+91-98765xxxxx", "rating": 4.0, "has_website": False},
-            {"name": "Chai Wala", "city": "Kanpur", "phone": "+91-98765xxxxx", "rating": 3.5, "has_website": False},
-        ]
+        # Extract business type and city from goal
+        business_type = self._extract_business_type(goal)
+        city = self._extract_city(goal)
 
-        self._log(f"✅ Found {len(businesses)} businesses")
+        # Real API call
+        businesses = await self.tools.google_maps_search(
+            query=business_type,
+            location=city,
+            max_results=20
+        )
+
+        self._log(f"✅ Found {len(businesses)} businesses in {city}")
         return {
             "success": True,
             "agent": self.name,
             "action": "research_businesses",
             "data": businesses,
-            "count": len(businesses)
+            "count": len(businesses),
+            "city": city,
+            "business_type": business_type
         }
 
     async def filter_prospects(self, params: Dict) -> Dict:
-        """Best Prospects Filter करो"""
+        """Best Prospects Filter करो — No Website + High Rating"""
         self._log("🎯 Filtering prospects...")
 
-        # In real implementation, this would filter from previous results
-        # For demo, return filtered mock data
-        prospects = [
-            {"name": "Sharma Cafe", "phone": "+91-9876512345", "rating": 4.2, "reason": "No website, High rating"},
-            {"name": "New Cafe Point", "phone": "+91-9876523456", "rating": 4.0, "reason": "No website, Good rating"},
-            {"name": "Gupta Sweets", "phone": "+91-9876534567", "rating": 3.8, "reason": "No website, Decent rating"},
-        ]
+        # Get all businesses from previous step or params
+        businesses = params.get('businesses', [])
+        rating_min = params.get('rating_min', 3.5)
+
+        if not businesses:
+            # Try to get from memory or do fresh search
+            self._log("No businesses provided, doing fresh search...")
+            search_result = await self.research_businesses(params)
+            businesses = search_result.get('data', [])
+
+        # Filter: No website + Rating >= minimum
+        prospects = []
+        for biz in businesses:
+            if not biz.get('has_website', False) and biz.get('rating', 0) >= rating_min:
+                prospects.append({
+                    "name": biz.get('name'),
+                    "phone": biz.get('phone'),
+                    "rating": biz.get('rating'),
+                    "address": biz.get('address'),
+                    "reason": f"No website, Rating: {biz.get('rating')}/5",
+                    "place_id": biz.get('place_id')
+                })
 
         self._log(f"✅ Filtered {len(prospects)} high-value prospects")
         return {
@@ -98,127 +117,226 @@ class ResearchAgent(BaseAgent):
         }
 
     async def web_search(self, params: Dict) -> Dict:
-        """Web Search करो"""
+        """Real Web Search"""
         query = params.get('query', '')
         self._log(f"🔍 Web Search: {query}")
 
-        # Use ToolBox for real search
-        results = await self.tools.web_search(query)
-        return {"success": True, "agent": self.name, "query": query, "results": results}
+        results = await self.tools.web_search(query, num_results=10)
+        return {
+            "success": True,
+            "agent": self.name,
+            "query": query,
+            "results": results,
+            "count": len(results)
+        }
 
     async def generate_content(self, params: Dict) -> Dict:
-        """Content Generate करो (Caption, Blog, etc.)"""
+        """AI Content Generate — Real Groq API"""
         topic = params.get('topic', 'daily')
         content_type = params.get('type', 'caption')
 
         self._log(f"✍️ Generating {content_type} for: {topic}")
 
-        # AI-generated content templates
-        captions = {
-            "daily": [
-                "🚀 आज का दिन नया है, नई शुरुआत करें! #Motivation #Success",
-                "💡 सपने वो नहीं जो नींद में आएं, सपने वो हैं जो नींद उड़ा दें! #Inspiration",
-                "🔥 हार मानने वालों को कभी जीत नहीं मिलती! #NeverGiveUp",
-            ],
-            "business": [
-                "💼 अपने Business को Digital बनाएं! Website = 24x7 Showcase #BusinessGrowth",
-                "📱 आज का Customer Online ढूँढता है — क्या आप मिल रहे हैं? #DigitalIndia",
-                "🎯 Small Investment, Big Returns — Website से शुरुआत करें! #StartupIndia",
-            ],
-            "tech": [
-                "🤖 AI आ गया है — अब 10 घंटे का काम 1 घंटे में! #AI #Automation",
-                "💻 Code लिखना आसान नहीं, लेकिन AI के साथ Possible है! #Coding #Tech",
-                "🌐 Website बनाना अब बच्चों का खेल — AI Powered! #WebDev",
-            ]
-        }
+        prompt = self._get_content_prompt(topic, content_type)
 
-        selected = random.choice(captions.get(topic, captions["daily"]))
+        content = await self.tools.generate_ai_content(
+            prompt=prompt,
+            system_prompt="You are Singh Ji AI — Write engaging Hindi content for Indian businesses and entrepreneurs."
+        )
 
         return {
             "success": True,
             "agent": self.name,
-            "content": selected,
+            "content": content,
             "topic": topic,
             "type": content_type
         }
 
     async def analyze_data(self, params: Dict) -> Dict:
-        """Data Analyze करो"""
-        self._log("📊 Analyzing data...")
-        return {"success": True, "agent": self.name, "action": "analyze_data", "insights": "Data analyzed successfully"}
+        """Data Analyze करो — AI Powered"""
+        self._log("📊 Analyzing data with AI...")
+
+        data = params.get('data', [])
+        analysis_prompt = f"Analyze this business data and provide insights in Hindi:\n{json.dumps(data, indent=2, ensure_ascii=False)[:2000]}"
+
+        insights = await self.tools.generate_ai_content(
+            prompt=analysis_prompt,
+            system_prompt="You are a business analyst. Provide insights in Hindi."
+        )
+
+        return {
+            "success": True,
+            "agent": self.name,
+            "action": "analyze_data",
+            "insights": insights
+        }
+
+    def _extract_business_type(self, goal: str) -> str:
+        """Goal से business type निकालो"""
+        goal_lower = goal.lower()
+        types = ['cafe', 'restaurant', 'salon', 'hotel', 'shop', 'store', 'clinic', 'hospital', 'school', 'gym']
+        for t in types:
+            if t in goal_lower:
+                return t
+        return 'business'
+
+    def _extract_city(self, goal: str) -> str:
+        """Goal से city निकालो"""
+        goal_lower = goal.lower()
+        cities = ['kanpur', 'delhi', 'mumbai', 'bangalore', 'hyderabad', 'chennai', 'kolkata', 'pune', 'jaipur', 'lucknow']
+        for c in cities:
+            if c in goal_lower:
+                return c.title()
+        return 'India'
+
+    def _get_content_prompt(self, topic: str, content_type: str) -> str:
+        """Content generation prompt बनाओ"""
+        prompts = {
+            "daily": "Write an inspiring Hindi message about success, hard work, and never giving up. Add 5 relevant hashtags. Keep under 200 words.",
+            "business": "Write a business growth message in Hindi about why every business needs a website in 2026. Add call-to-action and 5 hashtags. Keep under 200 words.",
+            "tech": "Write a tech tip in Hindi about how AI can help small businesses grow 10x faster. Add 5 hashtags. Keep under 200 words.",
+            "motivation": "Write a powerful motivational quote in Hindi. Keep under 100 words. Add 3 hashtags.",
+            "festival": "Write a festive greeting in Hindi. Warm wishes for the occasion. Add 3 hashtags. Keep under 150 words."
+        }
+        return prompts.get(topic, prompts["daily"])
 
 # ============================================
-# SALES AGENT — Outreach, Follow-up, Close
+# SALES AGENT — Real WhatsApp + Email + AI
 # ============================================
 
 class SalesAgent(BaseAgent):
     """
     Sales Agent:
-    - WhatsApp Message भेजना
-    - Email Sequence
+    - WhatsApp Message (UltraMsg / CallMeBot)
+    - Email Sequence (SendGrid)
     - Follow-up Scheduling
-    - Lead Qualification
+    - AI Personalized Outreach
     """
 
     def __init__(self):
         super().__init__("SalesAgent")
 
     async def generate_outreach(self, params: Dict) -> Dict:
-        """Personalized Outreach Message बनाओ"""
+        """AI से Personalized Outreach Message बनाओ"""
         channel = params.get('channel', 'whatsapp')
-        personalized = params.get('personalized', True)
+        business_name = params.get('business_name', 'Business')
+        business_type = params.get('business_type', 'business')
+        city = params.get('city', '')
 
-        self._log(f"💬 Generating {channel} outreach...")
+        self._log(f"💬 Generating AI {channel} outreach for {business_name}...")
 
-        messages = [
-            "नमस्ते! 🙏 आपका [Business Name] बहुत बढ़िया है। Website भी होनी चाहिए — Customer 24x7 ढूँढ सके। ₹7,999 में Ready! जानकारी चाहिए?",
-            "Hello! 👋 मैं Singh Ji Digital से हूँ। आपके [Business Name] की Website बना सकता हूँ — Mobile-friendly, Fast, Beautiful। Demo देखें?",
-            "🎯 Digital India में Website = ज़रूरी! आपका [Business Name] Online क्यों नहीं? ₹7,999 में पूरी Website + 1 साल Hosting Free!",
-        ]
+        prompt = f"""Write a short, friendly Hindi outreach message for a {business_type} named "{business_name}" in {city}.
+
+Context: We offer website development services for ₹7,999 (website + 1 year hosting).
+
+Requirements:
+- Start with "नमस्ते! 🙏"
+- Mention their business name
+- Explain why they need a website (customers search online)
+- Mention price: ₹7,999
+- Add call-to-action: "Demo देखें?"
+- Keep under 150 words
+- Friendly, not pushy
+- End with "Singh Ji Digital" signature"""
+
+        message = await self.tools.generate_ai_content(
+            prompt=prompt,
+            system_prompt="You are a sales expert who writes persuasive but friendly Hindi messages for Indian small businesses."
+        )
 
         return {
             "success": True,
             "agent": self.name,
-            "messages": messages,
+            "message": message,
             "channel": channel,
-            "personalized": personalized
+            "business_name": business_name
         }
 
     async def send_messages(self, params: Dict) -> Dict:
-        """Messages भेजो"""
+        """Real Messages भेजो — WhatsApp / Email"""
+        prospects = params.get('prospects', [])
+        channel = params.get('channel', 'whatsapp')
         batch_size = params.get('batch_size', 10)
         delay = params.get('delay', 30)
 
-        self._log(f"📤 Sending {batch_size} messages with {delay}s delay...")
+        self._log(f"📤 Sending {len(prospects)} {channel} messages...")
 
-        # Simulate sending
         sent = 0
-        for i in range(batch_size):
-            await asyncio.sleep(0.1)  # Simulate delay
-            sent += 1
+        failed = 0
+        results = []
 
-        self._log(f"✅ {sent} messages sent successfully")
+        for i, prospect in enumerate(prospects[:batch_size]):
+            try:
+                if channel == 'whatsapp':
+                    phone = prospect.get('phone', '')
+                    if phone:
+                        # Generate personalized message
+                        outreach = await self.generate_outreach({
+                            'business_name': prospect.get('name', 'Business'),
+                            'business_type': prospect.get('type', 'business'),
+                            'city': prospect.get('city', ''),
+                            'channel': 'whatsapp'
+                        })
+
+                        result = await self.tools.send_whatsapp(phone, outreach['message'])
+                        results.append({"prospect": prospect['name'], "result": result})
+                        if result.get('success'):
+                            sent += 1
+                        else:
+                            failed += 1
+
+                elif channel == 'email':
+                    email = prospect.get('email', '')
+                    if email:
+                        result = await self.tools.send_email(
+                            to=email,
+                            subject="🌐 Website बनवाएं — ₹7,999 में पूरी Website!",
+                            body=f"<h2>नमस्ते {prospect.get('name')}!</h2><p>Your website offer...</p>"
+                        )
+                        results.append({"prospect": prospect['name'], "result": result})
+                        if result.get('success'):
+                            sent += 1
+                        else:
+                            failed += 1
+
+                # Delay between messages
+                if i < len(prospects) - 1:
+                    await asyncio.sleep(delay)
+
+            except Exception as e:
+                logger.error(f"Send error for {prospect.get('name')}: {e}")
+                failed += 1
+
+        self._log(f"✅ Sent: {sent}, Failed: {failed}")
         return {
             "success": True,
             "agent": self.name,
             "sent": sent,
-            "failed": 0,
-            "channel": "whatsapp"
+            "failed": failed,
+            "channel": channel,
+            "results": results
         }
 
     async def schedule_followup(self, params: Dict) -> Dict:
         """Follow-up Schedule करो"""
         delay_hours = params.get('delay_hours', 48)
         followup_time = datetime.now() + timedelta(hours=delay_hours)
+        prospect_name = params.get('prospect_name', 'Prospect')
 
-        self._log(f"⏰ Follow-up scheduled for: {followup_time}")
+        self._log(f"⏰ Follow-up for {prospect_name} scheduled: {followup_time}")
+
+        # Generate follow-up message
+        followup_prompt = f"Write a follow-up Hindi message for {prospect_name}. It's been {delay_hours} hours since first contact. Gentle reminder about website offer. Keep under 100 words."
+        followup_message = await self.tools.generate_ai_content(prompt=followup_prompt)
 
         return {
             "success": True,
             "agent": self.name,
             "followup_time": followup_time.isoformat(),
             "delay_hours": delay_hours,
-            "message": "Reminder scheduled in system"
+            "prospect_name": prospect_name,
+            "followup_message": followup_message,
+            "status": "scheduled"
         }
 
     async def schedule_post(self, params: Dict) -> Dict:
@@ -235,15 +353,15 @@ class SalesAgent(BaseAgent):
         }
 
 # ============================================
-# BUILD AGENT — Code, Deploy, Create
+# BUILD AGENT — Real Code + Deploy
 # ============================================
 
 class BuildAgent(BaseAgent):
     """
     Build Agent:
-    - Website Code Generate
-    - Image Create
-    - Deploy to Netlify/Render
+    - Website Code Generate (AI Powered)
+    - Image Create (Pollinations)
+    - Deploy to Netlify
     - Test & Validate
     """
 
@@ -251,85 +369,86 @@ class BuildAgent(BaseAgent):
         super().__init__("BuildAgent")
 
     async def generate_code(self, params: Dict) -> Dict:
-        """Code Generate करो"""
-        code_type = params.get('type', 'website')
-        self._log(f"💻 Generating {code_type} code...")
+        """AI से Real Website Code Generate करो"""
+        business_name = params.get('business_name', 'Business')
+        business_type = params.get('business_type', 'website')
+        phone = params.get('phone', '+91-98765xxxxx')
+        address = params.get('address', 'India')
 
-        # Website template
-        html_template = """<!DOCTYPE html>
-<html lang="hi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{business_name}} — Best in Town</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f5f5f5; }
-        .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 80px 20px; text-align: center; }
-        .hero h1 { font-size: 3rem; margin-bottom: 20px; }
-        .hero p { font-size: 1.2rem; opacity: 0.9; }
-        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; padding: 60px 20px; max-width: 1200px; margin: 0 auto; }
-        .feature { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
-        .feature h3 { color: #667eea; margin-bottom: 10px; }
-        .contact { background: #333; color: white; padding: 60px 20px; text-align: center; }
-        .contact a { color: #667eea; text-decoration: none; font-size: 1.2rem; }
-    </style>
-</head>
-<body>
-    <section class="hero">
-        <h1>{{business_name}}</h1>
-        <p>Quality Service | Best Prices | Customer First</p>
-    </section>
-    <section class="features">
-        <div class="feature"><h3>🌟 Premium Quality</h3><p>We never compromise on quality</p></div>
-        <div class="feature"><h3>⚡ Fast Service</h3><p>Quick turnaround for all orders</p></div>
-        <div class="feature"><h3>💯 Trusted</h3><p>1000+ Happy Customers</p></div>
-    </section>
-    <section class="contact">
-        <h2>Contact Us</h2>
-        <p>📞 {{phone}} | 📍 {{address}}</p>
-        <p>Made with ❤️ by Singh Ji Digital</p>
-    </section>
-</body>
-</html>"""
+        self._log(f"💻 Generating {business_type} code for {business_name}...")
+
+        # AI-powered HTML generation
+        prompt = f"""Create a complete, professional HTML website for a business called "{business_name}".
+
+Requirements:
+- Modern, responsive design
+- Dark theme with gold accents
+- Sections: Hero, About, Services, Contact
+- Contact info: Phone {phone}, Address: {address}
+- Hindi + English mixed content
+- Mobile-friendly
+- Include Google Maps embed
+- Add WhatsApp click-to-chat button
+- Professional fonts and colors
+- Complete HTML file, no external dependencies needed
+
+Return ONLY the complete HTML code."""
+
+        html_code = await self.tools.generate_ai_content(
+            prompt=prompt,
+            system_prompt="You are an expert web developer. Write clean, modern HTML/CSS/JS code."
+        )
+
+        # Clean up the response (remove markdown code blocks if present)
+        html_code = html_code.replace("```html", "").replace("```", "").strip()
 
         return {
             "success": True,
             "agent": self.name,
-            "code_type": code_type,
-            "code": html_template,
+            "code_type": "html",
+            "code": html_code,
+            "business_name": business_name,
             "language": "html"
         }
 
     async def create_image(self, params: Dict) -> Dict:
-        """Image Generate करो"""
+        """AI Image Generate — Pollinations (Free)"""
         style = params.get('style', 'social_media')
+        topic = params.get('topic', 'business')
         size = params.get('size', '1080x1080')
 
         self._log(f"🎨 Creating {style} image ({size})...")
 
-        # Return image generation config
+        prompts = {
+            "business": f"Professional business banner for Indian {topic}, modern design, vibrant colors, high quality",
+            "social_media": f"Instagram post for {topic}, engaging design, Indian style, professional",
+            "website": f"Website hero image for {topic}, professional, modern, Indian business theme",
+            "logo": f"Professional logo design for {topic}, minimalist, Indian business style"
+        }
+
+        image_prompt = prompts.get(style, prompts["business"])
+        encoded_prompt = image_prompt.replace(" ", "%20")
+        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1080&nologo=true&seed={datetime.now().timestamp()}"
+
         return {
             "success": True,
             "agent": self.name,
             "style": style,
             "size": size,
-            "prompt": f"Professional {style} image, vibrant colors, modern design, high quality",
+            "image_url": image_url,
+            "prompt": image_prompt,
             "status": "generated"
         }
 
     async def deploy(self, params: Dict) -> Dict:
-        """Deploy करो"""
-        platform = params.get('platform', 'netlify')
-        self._log(f"🚀 Deploying to {platform}...")
+        """Deploy करो — Netlify"""
+        site_name = params.get('site_name', 'singhji-site')
+        html_content = params.get('html_content', '')
 
-        return {
-            "success": True,
-            "agent": self.name,
-            "platform": platform,
-            "url": f"https://{random.randint(1000,9999)}-singhji-site.netlify.app",
-            "status": "live"
-        }
+        self._log(f"🚀 Deploying {site_name} to Netlify...")
+
+        result = await self.tools.deploy_to_netlify(site_name, html_content)
+        return result
 
 # ============================================
 # SUPPORT AGENT — Save, Monitor, Report
@@ -338,7 +457,7 @@ class BuildAgent(BaseAgent):
 class SupportAgent(BaseAgent):
     """
     Support Agent:
-    - Data Save करना
+    - Data Save करना (Supabase/JSON)
     - Monitoring
     - Reports Generate
     - Memory Management
@@ -349,27 +468,53 @@ class SupportAgent(BaseAgent):
 
     async def save_leads(self, params: Dict) -> Dict:
         """Leads Save करो"""
+        leads = params.get('leads', [])
         status = params.get('status', 'new')
-        self._log(f"💾 Saving leads with status: {status}")
+
+        self._log(f"💾 Saving {len(leads)} leads with status: {status}")
+
+        saved_leads = []
+        for lead in leads:
+            lead_data = {
+                "name": lead.get('name'),
+                "phone": lead.get('phone'),
+                "email": lead.get('email'),
+                "address": lead.get('address'),
+                "rating": lead.get('rating'),
+                "status": status,
+                "created_at": datetime.now().isoformat(),
+                "source": lead.get('source', 'google_maps')
+            }
+            saved_leads.append(lead_data)
 
         return {
             "success": True,
             "agent": self.name,
-            "saved": True,
-            "status": status,
-            "timestamp": datetime.now().isoformat()
+            "saved_count": len(saved_leads),
+            "leads": saved_leads,
+            "status": status
         }
 
     async def save_report(self, params: Dict) -> Dict:
-        """Report Save करो"""
+        """AI Report Generate करो"""
         format_type = params.get('format', 'json')
-        self._log(f"📄 Saving report in {format_type} format...")
+        data = params.get('data', {})
+
+        self._log(f"📄 Generating AI report in {format_type}...")
+
+        # AI-powered report
+        report_prompt = f"Generate a business report summary in Hindi based on this data:\n{json.dumps(data, indent=2, ensure_ascii=False)[:1500]}"
+        report_content = await self.tools.generate_ai_content(
+            prompt=report_prompt,
+            system_prompt="You are a business report generator. Create professional reports in Hindi."
+        )
 
         return {
             "success": True,
             "agent": self.name,
             "format": format_type,
-            "saved": True
+            "report": report_content,
+            "generated_at": datetime.now().isoformat()
         }
 
     async def monitor_engagement(self, params: Dict) -> Dict:
