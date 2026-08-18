@@ -213,26 +213,9 @@ Agents available:
             return {"success": False, "error": f"Agent {agent_name} not found"}
 
         # Execute based on action type
-        action_map = {
-            "research_businesses": agent.research_businesses,
-            "filter_prospects": agent.filter_prospects,
-            "generate_outreach": agent.generate_outreach,
-            "send_messages": agent.send_messages,
-            "schedule_followup": agent.schedule_followup,
-            "generate_content": agent.generate_content,
-            "create_image": agent.create_image,
-            "web_search": agent.web_search,
-            "generate_code": agent.generate_code,
-            "deploy": agent.deploy,
-            "save_leads": agent.save_leads,
-            "save_report": agent.save_report,
-            "monitor_engagement": agent.monitor_engagement,
-            "analyze_data": agent.analyze_data,
-            "analyze_goal": agent.analyze_data,
-            "schedule_post": agent.schedule_post
-        }
-
-        handler = action_map.get(action)
+        if action == "analyze_goal":
+            action = "analyze_data"
+        handler = getattr(agent, action, None)
         if handler:
             return await handler(params)
         else:
