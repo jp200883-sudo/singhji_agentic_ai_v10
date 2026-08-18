@@ -181,35 +181,64 @@ class ToolBox:
                 html = await resp.text()
                 # Basic parsing — in production use beautifulsoup
                 return [{"title": "DuckDuckGo Result", "link": "", "snippet": f"Found results for: {query}", "source": "duckduckgo"}]
-        return []
-
-    # ============================================
-    # GOOGLE MAPS — Real Places API
+        return []# ============================================
+    # GOOGLE MAPS — Places API (New)
     # ============================================
 
     async def google_maps_search(self, query: str, location: str = "India", max_results: int = 10) -> List[Dict]:
-        """Google Maps Places API — Real Business Data"""
+        """Google Maps Places API (New) — Real Business Data"""
         if not self.google_maps_key:
             logger.warning("No GOOGLE_MAPS_API_KEY — Using demo data")
             return self._mock_businesses(query, location)
 
         try:
-            # Step 1: Text Search
-            search_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-            params = {
-                "query": f"{query} in {location}",
-                "key": self.google_maps_key,
-                "language": "hi",
-                "region": "in"
+            url = "https://places.googleapis.com/v1/places:searchText"
+            headers = {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": self.google_maps_key,
+                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.types,places.nationalPhoneNumber,places.websiteUri"
+            }
+            payload = {
+                "textQuery": f"{query} in {location}",
+                "languageCode": "hi",
+                "regionCode": "IN",
+                "pageSize": min(max_results, 20)
             }
 
             session = await self._get_session()
-            async with session.get(search_url, params=params) as resp:
-                data = await resp.json()
-
-                if data.get("status") != "OK":
-                    logger.error(f"Google Maps Error: {data.get('status')} — {data.get('error_message', '')}")
+            async with session.post(url, headers=headers, json=payload) as resp:
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    logger.error(f"Google Maps Error ({resp.status}): {error_text}")
                     return self._mock_businesses(query, location)
+
+                data = await resp.json()
+                places = data.get("places", [])
+                
+                businesses = []
+                for place in places:
+                    name_obj = place.get("displayName", {})
+                    website = place.get("websiteUri")
+                    phone = place.get("nationalPhoneNumber")
+                    
+                    biz = {
+                        "name": name_obj.get("text", "") if isinstance(name_obj, dict) else place.get("name", ""),
+                        "address": place.get("formattedAddress", ""),
+                        "rating": place.get("rating", 0),
+                        "place_id": place.get("id"),
+                        "types": place.get("types", []),
+                        "phone": phone,
+                        "website": website,
+                        "has_website": bool(website)
+                    }
+                    businesses.append(biz)
+
+                logger.info(f"✅ Google Maps (New API): Found {len(businesses)} real businesses")
+                return businesses
+
+        except Exception as e:
+            logger.error(f"Google Maps Exception: {e}")
+            return self._mock_businesses(query, location)
 
                 businesses = []
                 for place in data.get("results", [])[:max_results]:
