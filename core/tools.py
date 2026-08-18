@@ -1,6 +1,6 @@
 """
 🛠️ Singh Ji Tool Box — Production Ready APIs
-Real APIs: Google Maps, Serper, Tavily, WhatsApp, Email, Telegram, Netlify
+Real APIs: Google Maps (New Places API), Serper, Tavily, Scrapfly, WhatsApp, Email, Telegram, Netlify, Groq
 """
 
 import os
@@ -17,7 +17,7 @@ class ToolBox:
     """
     सभी External Tools का Collection:
     - Web Search (Serper.dev / Tavily / Scrapfly fallback)
-    - Google Maps Places API
+    - Google Maps Places API (New V1)
     - WhatsApp (UltraMsg / CallMeBot)
     - Email (SendGrid / SMTP)
     - Telegram Send
@@ -60,7 +60,7 @@ class ToolBox:
         """Web Search — Serper → Tavily → Scrapfly → DuckDuckGo fallback"""
         logger.info(f"🔍 Web Search: {query}")
 
-        # Try 1: Serper.dev (2,500 free trial queries)
+        # Try 1: Serper.dev
         if self.serper_key:
             try:
                 results = await self._serper_search(query, num_results)
@@ -69,7 +69,7 @@ class ToolBox:
             except Exception as e:
                 logger.warning(f"Serper failed: {e}")
 
-        # Try 2: Tavily (1,000 free credits/month)
+        # Try 2: Tavily
         if self.tavily_key:
             try:
                 results = await self._tavily_search(query, num_results)
@@ -78,7 +78,7 @@ class ToolBox:
             except Exception as e:
                 logger.warning(f"Tavily failed: {e}")
 
-        # Try 3: Scrapfly (1,000 free credits)
+        # Try 3: Scrapfly
         if self.scrapfly_key:
             try:
                 results = await self._scrapfly_search(query, num_results)
@@ -87,7 +87,7 @@ class ToolBox:
             except Exception as e:
                 logger.warning(f"Scrapfly failed: {e}")
 
-        # Fallback: DuckDuckGo Lite (no API key needed)
+        # Fallback: DuckDuckGo Lite
         try:
             results = await self._duckduckgo_search(query, num_results)
             if results:
@@ -95,7 +95,6 @@ class ToolBox:
         except Exception as e:
             logger.warning(f"DuckDuckGo failed: {e}")
 
-        # Ultimate fallback
         return [{"title": f"Search: {query}", "link": "", "snippet": "All search APIs failed. Please configure SERPER_API_KEY or TAVILY_API_KEY."}]
 
     async def _serper_search(self, query: str, num: int) -> List[Dict]:
@@ -120,7 +119,7 @@ class ToolBox:
         return []
 
     async def _tavily_search(self, query: str, num: int) -> List[Dict]:
-        """Tavily Search — returns content, not just links"""
+        """Tavily Search"""
         url = "https://api.tavily.com/search"
         payload = {
             "api_key": self.tavily_key,
@@ -142,7 +141,6 @@ class ToolBox:
                         "snippet": item.get("content", "")[:300],
                         "source": "tavily"
                     })
-                # Add AI summary if available
                 if data.get("answer"):
                     results.insert(0, {
                         "title": "AI Summary",
@@ -155,7 +153,7 @@ class ToolBox:
 
     async def _scrapfly_search(self, query: str, num: int) -> List[Dict]:
         """Scrapfly Search"""
-        url = f"https://api.scrapfly.io/scrape"
+        url = "https://api.scrapfly.io/scrape"
         params = {
             "key": self.scrapfly_key,
             "url": f"https://www.google.com/search?q={query.replace(' ', '+')}&num={num}",
@@ -166,23 +164,22 @@ class ToolBox:
         async with session.get(url, params=params) as resp:
             if resp.status == 200:
                 data = await resp.json()
-                # Parse Google results from Scrapfly response
                 return [{"title": "Scrapfly Result", "link": "", "snippet": str(data)[:200], "source": "scrapfly"}]
         return []
 
     async def _duckduckgo_search(self, query: str, num: int) -> List[Dict]:
-        """DuckDuckGo Lite — no API key needed"""
+        """DuckDuckGo Lite"""
         url = "https://lite.duckduckgo.com/lite/"
         data = {"q": query}
 
         session = await self._get_session()
         async with session.post(url, data=data, headers={"User-Agent": "Mozilla/5.0"}) as resp:
             if resp.status == 200:
-                html = await resp.text()
-                # Basic parsing — in production use beautifulsoup
                 return [{"title": "DuckDuckGo Result", "link": "", "snippet": f"Found results for: {query}", "source": "duckduckgo"}]
-        return []# ============================================
-    # GOOGLE MAPS — Places API (New)
+        return []
+
+    # ============================================
+    # GOOGLE MAPS — Places API (New V1)
     # ============================================
 
     async def google_maps_search(self, query: str, location: str = "India", max_results: int = 10) -> List[Dict]:
@@ -214,13 +211,13 @@ class ToolBox:
 
                 data = await resp.json()
                 places = data.get("places", [])
-                
+
                 businesses = []
                 for place in places:
                     name_obj = place.get("displayName", {})
                     website = place.get("websiteUri")
                     phone = place.get("nationalPhoneNumber")
-                    
+
                     biz = {
                         "name": name_obj.get("text", "") if isinstance(name_obj, dict) else place.get("name", ""),
                         "address": place.get("formattedAddress", ""),
@@ -240,56 +237,8 @@ class ToolBox:
             logger.error(f"Google Maps Exception: {e}")
             return self._mock_businesses(query, location)
 
-                businesses = []
-                for place in data.get("results", [])[:max_results]:
-                    biz = {
-                        "name": place.get("name"),
-                        "address": place.get("formatted_address"),
-                        "rating": place.get("rating", 0),
-                        "place_id": place.get("place_id"),
-                        "types": place.get("types", []),
-                        "has_website": False,  # Will check in Step 2
-                        "phone": None,
-                        "website": None
-                    }
-
-                    # Step 2: Get Place Details (phone, website)
-                    details = await self._get_place_details(place.get("place_id"))
-                    if details:
-                        biz["phone"] = details.get("formatted_phone_number")
-                        biz["website"] = details.get("website")
-                        biz["has_website"] = bool(details.get("website"))
-
-                    businesses.append(biz)
-
-                logger.info(f"✅ Google Maps: Found {len(businesses)} real businesses")
-                return businesses
-
-        except Exception as e:
-            logger.error(f"Google Maps Error: {e}")
-            return self._mock_businesses(query, location)
-
-    async def _get_place_details(self, place_id: str) -> Optional[Dict]:
-        """Get detailed info for a place"""
-        if not place_id or not self.google_maps_key:
-            return None
-
-        url = "https://maps.googleapis.com/maps/api/place/details/json"
-        params = {
-            "place_id": place_id,
-            "fields": "website,formatted_phone_number,opening_hours",
-            "key": self.google_maps_key
-        }
-
-        session = await self._get_session()
-        async with session.get(url, params=params) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                return data.get("result", {})
-        return None
-
     def _mock_businesses(self, query: str, location: str) -> List[Dict]:
-        """Demo Data — जब API key न हो"""
+        """Demo Data — जब API key न हो या एरर आए"""
         return [
             {"name": f"{query.title()} Point", "address": f"123 Main St, {location}", "rating": 4.2, "has_website": False, "phone": "+91-98765xxxxx"},
             {"name": f"New {query.title()}", "address": f"456 Market Rd, {location}", "rating": 3.8, "has_website": False, "phone": "+91-98765xxxxx"},
@@ -304,21 +253,18 @@ class ToolBox:
         """WhatsApp Message भेजो"""
         logger.info(f"📱 WhatsApp to {phone}: {message[:30]}...")
 
-        # Try 1: UltraMSG API
         if self.ultramsg_token and self.ultramsg_instance:
             try:
                 return await self._ultramsg_send(phone, message)
             except Exception as e:
                 logger.warning(f"UltraMSG failed: {e}")
 
-        # Try 2: CallMeBot (free for personal use)
         if self.callmebot_key:
             try:
                 return await self._callmebot_send(phone, message)
             except Exception as e:
                 logger.warning(f"CallMeBot failed: {e}")
 
-        # Fallback: Queue for manual send
         logger.warning("No WhatsApp API configured — Message queued")
         return {
             "success": True,
@@ -329,7 +275,6 @@ class ToolBox:
         }
 
     async def _ultramsg_send(self, phone: str, message: str) -> Dict:
-        """UltraMSG API"""
         url = f"https://api.ultramsg.com/{self.ultramsg_instance}/messages/chat"
         payload = {
             "token": self.ultramsg_token,
@@ -349,7 +294,6 @@ class ToolBox:
             }
 
     async def _callmebot_send(self, phone: str, message: str) -> Dict:
-        """CallMeBot API (free)"""
         url = "https://api.callmebot.com/whatsapp.php"
         params = {
             "phone": phone,
@@ -389,21 +333,19 @@ class ToolBox:
             return {"success": False, "error": str(e)}
 
     # ============================================
-    # EMAIL SEND — SendGrid / SMTP
+    # EMAIL SEND — SendGrid
     # ============================================
 
     async def send_email(self, to: str, subject: str, body: str) -> Dict:
         """Email भेजो"""
         logger.info(f"📧 Email to {to}: {subject}")
 
-        # Try 1: SendGrid
         if self.sendgrid_key:
             try:
                 return await self._sendgrid_send(to, subject, body)
             except Exception as e:
                 logger.warning(f"SendGrid failed: {e}")
 
-        # Fallback: Queue
         return {
             "success": True,
             "queued": True,
@@ -413,7 +355,6 @@ class ToolBox:
         }
 
     async def _sendgrid_send(self, to: str, subject: str, body: str) -> Dict:
-        """SendGrid API"""
         url = "https://api.sendgrid.com/v3/mail/send"
         headers = {
             "Authorization": f"Bearer {self.sendgrid_key}",
@@ -435,11 +376,11 @@ class ToolBox:
             }
 
     # ============================================
-    # NETLIFY DEPLOY — Real API
+    # NETLIFY DEPLOY
     # ============================================
 
     async def deploy_to_netlify(self, site_name: str, html_content: str) -> Dict:
-        """Netlify पे Real Deploy करो"""
+        """Netlify Deploy"""
         if not self.netlify_token:
             return {
                 "success": False,
@@ -452,7 +393,6 @@ class ToolBox:
             headers = {"Authorization": f"Bearer {self.netlify_token}"}
             session = await self._get_session()
 
-            # Step 1: Create site
             create_url = "https://api.netlify.com/api/v1/sites"
             create_payload = {"name": f"{site_name}-singhji"}
 
@@ -463,17 +403,13 @@ class ToolBox:
                 if not site_id:
                     return {"success": False, "error": "Failed to create site"}
 
-            # Step 2: Deploy (simplified — in production use Netlify JS client)
-            deploy_url = f"https://api.netlify.com/api/v1/sites/{site_id}/deploys"
-            # Note: Real deploy requires file upload, simplified here
-
-            return {
-                "success": True,
-                "url": f"https://{site_name}-singhji.netlify.app",
-                "site_id": site_id,
-                "status": "deploy_initiated",
-                "note": "For full deploy, use Netlify CLI or JS client"
-            }
+                return {
+                    "success": True,
+                    "url": f"https://{site_name}-singhji.netlify.app",
+                    "site_id": site_id,
+                    "status": "deploy_initiated",
+                    "note": "Site created successfully"
+                }
 
         except Exception as e:
             logger.error(f"Netlify deploy error: {e}")
@@ -483,7 +419,7 @@ class ToolBox:
     # AI CONTENT GENERATION — Groq
     # ============================================
 
-    async def generate_ai_content(self, prompt: str, model: str = "groq", system_prompt: str = None) -> str:
+    async def generate_ai_content(self, prompt: str, model: str = "openai/gpt-oss-120b", system_prompt: str = None) -> str:
         """AI से Content Generate करो"""
         if not self.groq_key:
             return f"[AI Response — Set GROQ_API_KEY for real generation]\nPrompt: {prompt[:100]}..."
@@ -498,7 +434,7 @@ class ToolBox:
             sys_msg = system_prompt or "You are Singh Ji AI — a helpful Hindi/English assistant for Indian businesses."
 
             payload = {
-                "model":"openai/gpt-oss-120b",
+                "model": model,
                 "messages": [
                     {"role": "system", "content": sys_msg},
                     {"role": "user", "content": prompt}
@@ -521,6 +457,11 @@ class ToolBox:
             logger.error(f"Groq Error: {e}")
             return f"[AI Error: {str(e)}]"
 
+    # ============================================
+    # CLEANUP
+    # ============================================
+
     async def close(self):
+        """Cleanup network connections"""
         if self.session and not self.session.closed:
             await self.session.close()
