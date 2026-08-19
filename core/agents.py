@@ -278,7 +278,7 @@ Requirements:
                             'channel': 'whatsapp'
                         })
 
-                        result = await self.tools.send_whatsapp(phone, outreach['message'])
+                        result = await self.tools.send_sms(phone, outreach['message'])
                         results.append({"prospect": prospect['name'], "result": result})
                         if result.get('success'):
                             sent += 1
