@@ -44,6 +44,8 @@ class ToolBox:
         self.netlify_token = os.environ.get("NETLIFY_TOKEN")
         self.telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN")
         self.from_email = os.environ.get("FROM_EMAIL", "singhji@digital.com")
+        self.textbee_api_key = os.environ.get("TEXTBEE_API_KEY")
+        self.textbee_device_id = os.environ.get("TEXTBEE_DEVICE_ID")
 
     async def _get_session(self):
         if self.session is None or self.session.closed:
@@ -244,7 +246,32 @@ class ToolBox:
             {"name": f"New {query.title()}", "address": f"456 Market Rd, {location}", "rating": 3.8, "has_website": False, "phone": "+91-98765xxxxx"},
             {"name": f"Royal {query.title()}", "address": f"789 Palace Ln, {location}", "rating": 4.5, "has_website": True, "phone": "+91-98765xxxxx"},
         ]
+    
+    async def send_sms(self, phone: str, message: str) -> Dict:
+        """SMS भेजो — TextBee (Android Gateway)"""
+        logger.info(f"📩 SMS to {phone}: {message[:30]}...")
 
+        if not self.textbee_api_key or not self.textbee_device_id:
+            return {"success": False, "error": "TextBee not configured"}
+
+        try:
+            url = f"https://api.textbee.dev/api/v1/gateway/devices/{self.textbee_device_id}/send-sms"
+            headers = {"x-api-key": self.textbee_api_key}
+            payload = {"recipients": [phone], "message": message}
+
+            session = await self._get_session()
+            async with session.post(url, json=payload, headers=headers) as resp:
+                data = await resp.json()
+                return {
+                    "success": resp.status == 200,
+                    "status": resp.status,
+                    "provider": "textbee",
+                    "response": data
+                }
+        except Exception as e:
+            logger.error(f"TextBee SMS error: {e}")
+            return {"success": False, "error": str(e)}
+            
     # ============================================
     # WHATSAPP API — UltraMsg / CallMeBot
     # ============================================
