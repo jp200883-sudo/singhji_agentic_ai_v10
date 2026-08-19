@@ -48,10 +48,14 @@ class SinghJiOrchestrator:
         plan = await self._create_ai_plan(goal)
         logger.info(f"📋 AI Plan Created: {len(plan)} steps")
 
-        # Step 2: Step-by-Step Execute
+               # Step 2: Step-by-Step Execute
         results = []
+        context = {}  # पिछले steps का output यहाँ जमा होगा
         for i, step in enumerate(plan):
             logger.info(f"⚡ Executing Step {i+1}/{len(plan)}: {step['action']}")
+
+            # पिछले steps के output को इस step के params में जोड़ो
+            step['params'] = {**step.get('params', {}), **context}
 
             try:
                 result = await self._execute_step(step)
@@ -62,6 +66,12 @@ class SinghJiOrchestrator:
                     result = await self._retry_or_fix(step, result.get('error'))
 
                 results.append(result)
+
+                # Context अपडेट करो — अगले steps के लिए
+                if result.get('data'):
+                    context['businesses'] = result['data']
+                if result.get('prospects'):
+                    context['prospects'] = result['prospects']
 
                 # Save to Memory
                 if self.memory:
