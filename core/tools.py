@@ -263,7 +263,7 @@ class ToolBox:
             async with session.post(url, json=payload, headers=headers) as resp:
                 data = await resp.json()
                 return {
-                    "success": resp.status == 200,
+                    "success": resp.status == [200, 201],
                     "status": resp.status,
                     "provider": "textbee",
                     "response": data
